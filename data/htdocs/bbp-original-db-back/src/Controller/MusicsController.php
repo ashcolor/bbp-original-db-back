@@ -102,4 +102,38 @@ class MusicsController extends AppController
 
         return $this->redirect(['action' => 'index']);
     }
+
+    public function export(){
+        $req = $this->getRequest()->getData();
+
+        $query = $this->Musics->find();
+
+        $fp = fopen('php://temp/maxmemory:' . (1024 * 1024 * $query->count()), 'w+');
+
+        $schema = $this->Musics->getSchema();
+        $columns = $schema->columns();
+        $comments = [];
+        foreach($columns as $column) {
+            $column_data = $schema->getColumn($column);
+            $comments[] = $column_data['comment'];
+        }
+        fputcsv($fp, $comments);
+
+        foreach ($query as $q) {
+            $music = $q->jsonSerialize();
+            fputcsv($fp, $music);
+        }
+
+        rewind($fp);
+        $csv = stream_get_contents($fp);
+        fclose($fp);
+        $csv = mb_convert_encoding($csv, 'SJIS-win', 'utf8');
+
+        $this->autoRender = false;
+        $response = $this->response;
+        $response = $response->withStringBody($csv);
+        $response = $response->withDownload('music_' . date('Ymd') . '.csv');
+        return $response;
+
+    }
 }
